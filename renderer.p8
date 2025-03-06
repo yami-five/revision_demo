@@ -2,7 +2,9 @@ pico-8 cartridge // http://www.pico-8.com
 version 42
 __lua__
 t=0
+light="50,50,50"
 calc_light=false
+zBuffer={}
 tex='677765677656777677776566665677777777655ee55677777776555ee55567776665555ee55556665555555665555555665555677655556676eee6e77e6eee6776eee6eeee6eee676655556ee655556655555556655555556665555ee55556667776555ee55567777777655ee556777777776566665677776777656776567776'
 cameraMatrix="0,0,5,0,0,0,0,1,0,0,0,0,0,0,0"
 -- 1-3 position
@@ -12,7 +14,6 @@ cameraMatrix="0,0,5,0,0,0,0,1,0,0,0,0,0,0,0"
 -- 13-15 forward vector
 viewMatrix="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
 perspectiveMatrix="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-zbuffer=""
 
 function _init()
     cameraMatrix=split(cameraMatrix)
@@ -69,9 +70,16 @@ function _init()
     printh(perspectiveMatrix[5]..","..perspectiveMatrix[6]..","..perspectiveMatrix[7]..","..perspectiveMatrix[8],"log.txt")
     printh(perspectiveMatrix[9]..","..perspectiveMatrix[10]..","..perspectiveMatrix[11]..","..perspectiveMatrix[12],"log.txt")
     printh(perspectiveMatrix[13]..","..perspectiveMatrix[14]..","..perspectiveMatrix[15]..","..perspectiveMatrix[16],"log.txt")
-    -- for i=1,128*128 do
-    --     zbuffer=
-    -- end
+    for i=1,128*128 do
+        add(zBuffer,0)
+    end
+    light=split(light)
+end
+
+function clearZBuffer()
+    for i=1,128*128 do
+        add(zBuffer,0)
+    end    
 end
 
 function mulMatrixVector(x,y,z,w,matrix)
@@ -131,6 +139,17 @@ function texturing(Ba,Bb,Bc,uv0,uv1,uv2,tex_size,texture,tsts)
     return texture[max(0, min(tsts, flr(uv_y *tex_size + uv_x)))]
 end
 
+function checkDepth(Ba, Bb, Bc, z0, z1, z2, x, y)
+    z = 1/((Ba*1/z0)+(Bb*1/z1)+(Bc*1/z2))
+    addr=x*128+y
+    if(z>zBuffer[addr]) then
+        zBuffer[addr]=z
+        return 1
+    else
+        return 0
+    end
+end
+
 function rasterize(y, x0, x1, uv0, uv1, uv2, inv,p0,p1,p2,l_int,tex_size,texture,fast,tsts)
     if (y<0 or y>127) return
     local q,n
@@ -147,23 +166,25 @@ function rasterize(y, x0, x1, uv0, uv1, uv2, inv,p0,p1,p2,l_int,tex_size,texture
     for x = x0, x1, 1 do
         local color="0x11"
         local Ba,Bb,Bc=baricentricCoords(x,yp2y,inv,p0,p1,p2,0)
-        if(l_int>0.3)then
-            local texture_color1 = texturing(Ba,Bb,Bc,uv0,uv1,uv2,tex_size,texture,tsts)
-            if(l_int>0.97)then color="0xa"..texture_color1
-            elseif(l_int<=0.97 and l_int>0.5)then
-                color="0x"..texture_color1..texture_color1
-            elseif(l_int<=0.5)then color="0x1"..texture_color1
+        if(checkDepth(Ba, Bb, Bc, p0[3], p1[3], p2[3], x, y)) then
+            if(l_int>0.3)then
+                local texture_color1 = texturing(Ba,Bb,Bc,uv0,uv1,uv2,tex_size,texture,tsts)
+                if(l_int>0.97)then color="0xa"..texture_color1
+                elseif(l_int<=0.97 and l_int>0.5)then
+                    color="0x"..texture_color1..texture_color1
+                elseif(l_int<=0.5)then color="0x1"..texture_color1
+                end
             end
+            poke(0x6000 + y * 0x40 + x, color)
         end
-        poke(0x6000 + y * 0x40 + x, color)
     end
 end
 
-function tri(x0,y0,x1,y1,x2,y2,uv0,uv1,uv2,l_int,tex_size,texture,fast,tsts)
+function tri(x0,y0,z0,x1,y1,z1,x2,y2,z2,uv0,uv1,uv2,l_int,tex_size,texture,fast,tsts)
     local x,xx,y,q,q2,uv;
-    if (y0>y1) y=y0;y0=y1;y1=y;x=x0;x0=x1;x1=x;uv=uv0;uv0=uv1;uv1=uv;
-    if (y0>y2) y=y0;y0=y2;y2=y;x=x0;x0=x2;x2=x;uv=uv0;uv0=uv2;uv2=uv;
-    if (y1>y2) y=y1;y1=y2;y2=y;x=x1;x1=x2;x2=x;uv=uv1;uv1=uv2;uv2=uv;
+    if (y0>y1) y=y0;y0=y1;y1=y;x=x0;x0=x1;x1=x;uv=uv0;uv0=uv1;uv1=uv;z=z0;z0=z1;z1=z;
+    if (y0>y2) y=y0;y0=y2;y2=y;x=x0;x0=x2;x2=x;uv=uv0;uv0=uv2;uv2=uv;z=z0;z0=z2;z2=z;
+    if (y1>y2) y=y1;y1=y2;y2=y;x=x1;x1=x2;x2=x;uv=uv1;uv1=uv2;uv2=uv;z=z2;z2=z1;z1=z;
     local dx01,dy01,dx02,dy02;
     local xd,xxd;
     if (y2<0 or y0>127) return
@@ -175,7 +196,7 @@ function tri(x0,y0,x1,y1,x2,y2,uv0,uv1,uv2,l_int,tex_size,texture,fast,tsts)
         q,xd=0,1;
         if(x1<x0) xd=-1
         while y<=y1 do
-            rasterize(y,x,xx,uv0,uv1,uv2,inv,{x0,y0},{x1,y1},{x2,y2},l_int,tex_size,texture,fast,tsts);
+            rasterize(y,x,xx,uv0,uv1,uv2,inv,{x0,y0,z0},{x1,y1,z1},{x2,y2,z2},l_int,tex_size,texture,fast,tsts);
             y+=1;
             q+=dx01;
             q2+=dx02;
@@ -194,7 +215,7 @@ function tri(x0,y0,x1,y1,x2,y2,uv0,uv1,uv2,l_int,tex_size,texture,fast,tsts)
         q,x,xd=0,x1,1;
         if (x2<x1) xd=-1
         while y<=y2 and y<128 do
-            rasterize(y,x,xx,uv0,uv1,uv2,inv,{x0,y0},{x1,y1},{x2,y2},l_int,tex_size,texture,fast,tsts);
+            rasterize(y,x,xx,uv0,uv1,uv2,inv,{x0,y0,z0},{x1,y1,z1},{x2,y2,z2},l_int,tex_size,texture,fast,tsts);
             y+=1;
             q+=dx12;
             q2+=dx02;
@@ -225,7 +246,7 @@ function draw_model(p,qt,vertices,vt,vm,faces,f,tc,uv,textures,calc_light,tex_si
                 nv_len=v3_len(nv)
                 -- light direction
                 local tx,ty,tz=(vm[a*3+1]+vm[b*3+1]+vm[c*3+1])/3,(vm[a*3+2]+vm[b*3+2]+vm[c*3+2])/3,(vm[a*3+3]+vm[b*3+3]+vm[c*3+3])/3
-                l_dir={50-tx,50-ty,50-tz}
+                l_dir={light[1]-tx,light[1]-ty,light[3]-tz}
                 l_len=v3_len(l_dir)
                 -- cos
                 l_dir_nv=v3_len({l_dir[1]-nv[1],l_dir[2]-nv[2],l_dir[3]-nv[3]})
@@ -239,10 +260,13 @@ function draw_model(p,qt,vertices,vt,vm,faces,f,tc,uv,textures,calc_light,tex_si
             tri(
                 vt[a*3+1],
                 vt[a*3+2],
+                vt[a*3+3],
                 vt[b*3+1],
                 vt[b*3+2],
+                vt[b*3+3],
                 vt[c*3+1],
                 vt[c*3+2],
+                vt[c*3+3],
                 {tc[uv[i]*2+1],tc[uv[i]*2+2]},{tc[uv[i+1]*2+1],tc[uv[i+1]*2+2]},{tc[uv[i+2]*2+1],tc[uv[i+2]*2+2]},l_int,tex_size,textures[tex_i],fast,tsts)
         end
     end
@@ -258,7 +282,7 @@ function draw_cube(p)
         local x,y,z=v[j],v[j+1],v[j+2];
         y,z=rotate(y,z,qt);
         x,z=rotate(x,z,qt*1.5);
-        -- x,y=inf(qt+p,x,y)
+        x,y=inf(qt+p,x,y)
         -- y-=1
         z+=5
         add(vm,x);
@@ -270,7 +294,6 @@ function draw_cube(p)
         x,y,z,w=mulMatrixVector(x,y,z,w,perspectiveMatrix)
         x=x/w*64 + 64
         y=y/w*64 + 64
-        z/=w
         -- x=x*96/z+64;
         -- y=y*96/z+64;
         vt[j],vt[j+1],vt[j+2]=flr(x),flr(y),flr(z);
@@ -285,6 +308,7 @@ end
 function _draw()
     cls();
     draw_cube(0);
+    clearZBuffer();
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
