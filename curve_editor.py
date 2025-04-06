@@ -67,15 +67,74 @@ class curve:
             y+=3*self.points[2].get_y()*t*t*(1-t)
             y+=self.points[3].get_y()*t*t*t
             screen.set_at((int(x),int(y)),white)
+
+class workspacePoint:
+    def __init__(self, x, y):
+        self.x=x
+        self.y=y
         
-          
+    def get_pos(self):
+        return (self.x, self.y)
+    
+    def get_x(self):
+        return self.x
+    
+    def get_y(self):
+        return self.y
+        
+class workspace:
+    def __init__(self, width, height, scale, screen):
+        self.width=width
+        self.height=height
+        x=screen.get_width()/2-(width/2)*scale
+        y=screen.get_height()/2-(height/2)*scale 
+        self.a=workspacePoint(x,y)
+        self.b=workspacePoint(x+width*scale,y+height*scale)
+        self.scale=scale
+        
+    def get_size(self):
+        return (width,height)   
+    
+    def get_width(self):
+        return self.width
+    
+    def get_height(self):
+        return self.height
+    
+    def get_scale(self):
+        return self.scale
+    
+    def get_a(self):
+        return self.a
+    
+    def get_b(self):
+        return self.b
+    
+    def draw_workspace(self,screen):
+        width=self.width*self.scale
+        height=self.height*self.scale
+        pygame.draw.rect(screen,white,(self.a.get_x()-1,self.a.get_y()-1,width+2,height+2),1)
+        pygame.draw.rect(screen,teal,(self.a.get_x(),self.a.get_y(),width,height))
+        x=self.get_a().get_x()
+        y=self.get_a().get_y()
+        width=self.get_width()
+        height=self.get_height()
+        for i in range(0,width//8):
+            pygame.draw.line(screen, midnight_blue, (x+i*8*self.get_scale(),y),(x+i*8*self.get_scale(),y+height*self.scale-1),1)
+        for i in range(0,self.height//8):
+            pygame.draw.line(screen, midnight_blue, (x,y+i*8*self.get_scale()),(x+width*self.scale-1,y+i*8*self.get_scale()),1)
+        
+    
+    def out_of_workspace(self,pos):
+        return (pos[0]<self.a.get_x() and pos[1]<self.a.get_y()) or (pos[0]>=self.b.get_x() and pos[1]>=self.b.get_y())
 
 pygame.init()
 
-rect=(128,128)
 width, height = 800, 600
 scale=3
 screen=pygame.display.set_mode((width,height))
+targetScreen=workspace(128,128,scale,screen)
+pygame.display.set_caption("curve editor")
 
 points=curve()
 
@@ -85,21 +144,22 @@ grey = (127,127,127)
 red = (255,0,0)
 green = (0,255,0)
 blue = (0,0,255)
+teal = (0,128,128)
+midnight_blue = (25,25,112)
+
 
 running=True
 clicked=False
 activePoint=0
 while running:
-    screen.fill(black)
+    screen.fill(black)    
     mousePos=pygame.mouse.get_pos()
-    # pygame.draw.rect(screen,white,(width/2-(rect[0]/2)*scale,height/2-(rect[1]/2)*scale,rect[0]*scale,rect[1]*scale),1)
-    # for x in range (0,rect[0]/8):
-    #     pygame.draw.line(screen, grey, width/2-(rect[0]/2)*scale,width/2+(rect[0]/2)*scale)
+    targetScreen.draw_workspace(screen)
     for event in pygame.event.get():
         if event.type==pygame.QUIT:
             running=False
     if pygame.mouse.get_pressed()[0] and clicked is False:
-        if points.out_of_screen():
+        if points.out_of_screen() and targetScreen.out_of_workspace(mousePos) is False:
             points.add_curve_to_screen(mousePos)
             
     if points.out_of_screen() is False:
@@ -111,7 +171,7 @@ while running:
             else:
                 pygame.draw.rect(screen,blue,(p.x-3,p.y-3,p.outline,p.outline))
             pygame.draw.rect(screen,white,(p.x,p.y,p.size,p.size))
-            if p.is_clicked(mousePos) or p.isActive:
+            if (p.is_clicked(mousePos) or p.isActive) and targetScreen.out_of_workspace(mousePos) is False:
                 if pygame.mouse.get_pressed()[0] and clicked is False:
                     p.isActive=True
                     clicked=True
@@ -121,6 +181,8 @@ while running:
                 if pygame.mouse.get_pressed()[0] is False and clicked is True:
                     clicked=False
                     p.isActive=False
+                if p.isActive is False:
+                    p.move_point(((p.get_x()//targetScreen.get_scale())*targetScreen.get_scale(),(p.get_y()//targetScreen.get_scale())*targetScreen.get_scale()))
 
     pygame.display.flip()
 
