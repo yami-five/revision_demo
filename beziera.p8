@@ -2,23 +2,20 @@ pico-8 cartridge // http://www.pico-8.com
 version 42
 __lua__
 bPoints="\
-    60,50,120,50,120,70,60,70,\
-    50,60,37,60,37,80,50,80,\
-    50,60,63,60,63,80,50,80,\
-    50,40,37,40,37,60,50,60,\
-    50,40,63,40,63,60,50,60"
+        16,9,7,24,15,41,3,79,\
+        16,9,32,8,43,9,46,29,\
+        45,29,41,54,30,81,2,79,\
+        60,82,31,83,31,64,53,60,\
+        53,60,64,55,61,73,33,81,\
+        67,50,71,55,66,71,65,80,\
+        68,55,73,59,82,60,74,80,\
+        74,79,78,63,88,60,87,77,\
+        99,60,89,59,84,79,98,78,\
+        97,78,113,74,112,60,99,60"
+calculatedCurve={}
+t=-10
+c=7
 
-t=0
-c=1
-function _init()    
-    bPoints=split(bPoints)
-end
-function _update()
-    t+=0.02
-    if t>1 then t=0 end
-    c+=1
-    if c>15 then c=1 end
-end
 function calc_point(i,offset)
     x=bPoints[1+offset*8]*(1-i)*(1-i)*(1-i)
     x+=3*bPoints[3+offset*8]*i*(1-i)*(1-i)
@@ -32,14 +29,38 @@ function calc_point(i,offset)
 
     return flr(x+0.5),flr(y+0.5)
 end
-function _draw()
-    cls()
-    for j=0,4 do
-        for i=0,t,0.01 do
+function _init()
+    bPoints=split(bPoints)
+end
+function init()    
+    curvesCount=(#bPoints)/8
+    last_x, last_y=-1,-1
+    for j=0,curvesCount-1 do
+        for i=0,1,0.01 do
             x,y=calc_point(i,j)
-            pset(x,y,c)
+            printh(x.." "..y,"log.txt")
+            if x!=last_x or y!=last_y then
+                add(calculatedCurve,x)
+                add(calculatedCurve,y)
+                last_x,last_y=x,y
+            end
         end
     end
+end
+function _update()
+    t+=1
+    if t==0 then
+        init()  
+    end
+end
+function _draw()
+    if t<0 then
+        cls()
+        -- printh(t,"log.txt",true)
+    elseif t<#calculatedCurve then
+        pset(calculatedCurve[t*2+1],calculatedCurve[t*2+2],c)
+    end
+
 end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
