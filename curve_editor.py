@@ -15,6 +15,12 @@ class point:
     def get_pos(self):
         return (self.x, self.y)
     
+    def get_x(self):
+        return self.x
+    
+    def get_y(self):
+        return self.y
+    
     def out_of_screen(self):
         return (self.x<0 and self.y<0) or (self.x>=screen.get_width() and self.y>=screen.get_height())
     
@@ -46,6 +52,21 @@ class curve:
         pygame.draw.line(screen, grey,self.points[0].get_pos(),self.points[1].get_pos(),2)
         pygame.draw.line(screen, grey,self.points[1].get_pos(),self.points[2].get_pos(),2)
         pygame.draw.line(screen, grey,self.points[2].get_pos(),self.points[3].get_pos(),2)
+        
+    def draw_curve(self,screen):
+        for i in range (0,100):
+            t=i/100
+            x,y=0,0
+            x=self.points[0].get_x()*(1-t)*(1-t)*(1-t)
+            x+=3*self.points[1].get_x()*t*(1-t)*(1-t)
+            x+=3*self.points[2].get_x()*t*t*(1-t)
+            x+=self.points[3].get_x()*t*t*t
+
+            y=self.points[0].get_y()*(1-t)*(1-t)*(1-t)
+            y+=3*self.points[1].get_y()*t*(1-t)*(1-t)
+            y+=3*self.points[2].get_y()*t*t*(1-t)
+            y+=self.points[3].get_y()*t*t*t
+            screen.set_at((int(x),int(y)),white)
         
           
 
@@ -83,6 +104,7 @@ while running:
             
     if points.out_of_screen() is False:
         points.draw_lines(screen)
+        points.draw_curve(screen)
         for p in points.get_points():
             if p.isActive:
                 pygame.draw.rect(screen,green,(p.x-3,p.y-3,p.outline,p.outline))
