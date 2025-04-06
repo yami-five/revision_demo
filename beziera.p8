@@ -31,8 +31,6 @@ function calc_point(i,offset)
 end
 function _init()
     bPoints=split(bPoints)
-end
-function init()    
     curvesCount=(#bPoints)/8
     last_x, last_y=-1,-1
     for j=0,curvesCount-1 do
@@ -49,9 +47,6 @@ function init()
 end
 function _update()
     t+=1
-    if t==0 then
-        init()  
-    end
 end
 function _draw()
     if t<0 then
